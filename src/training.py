@@ -36,7 +36,7 @@ def train_one_epoch(
     epoch_num: int,
     scheduler=None,
 ):
-    total_loss = torch.tensor(0, dtype=torch.float32)
+    total_loss = 0.0
     history = []
 
     iters = len(data_loader)
@@ -59,16 +59,16 @@ def train_one_epoch(
 
             history.append(loss.item())
 
-            total_loss += loss
+            total_loss += loss.item()
 
             if scheduler is not None:
                 scheduler.step(epoch_num + batch_index / iters)
 
-        total_loss = (total_loss / (batch_index + 1)).item()
+        avg_loss = total_loss / (batch_index + 1)
 
-        p_loader.write(f"Avg. training loss at the end of epoch {total_loss: .3f}")
+        p_loader.write(f"Avg. training loss at the end of epoch {avg_loss: .3f}")
 
-        return total_loss, history
+        return avg_loss, history
 
 
 def validate_one_step(model: nn.Module, data, loss_fn) -> torch.Tensor:
@@ -81,9 +81,7 @@ def validate_one_step(model: nn.Module, data, loss_fn) -> torch.Tensor:
 
 
 def validate_one_epoch(model: nn.Module, data_loader, loss_fn, epoch_num: int):
-    model.eval()
-
-    total_loss = torch.tensor(0, dtype=torch.float32)
+    total_loss = 0.0
     history = []
 
     with tqdm(data_loader, unit="batch", desc=f"Epoch {epoch_num + 1}") as p_loader:
@@ -96,10 +94,10 @@ def validate_one_epoch(model: nn.Module, data_loader, loss_fn, epoch_num: int):
 
             history.append(loss.item())
 
-            total_loss += loss
+            total_loss += loss.item()
 
-        total_loss = (total_loss / (batch_index + 1)).item()
+        avg_loss = (total_loss / (batch_index + 1)).item()
 
-        p_loader.write(f"Avg. validation loss at the end of epoch {total_loss: .3f}")
+        p_loader.write(f"Avg. validation loss at the end of epoch {avg_loss: .3f}")
 
         return total_loss, history
