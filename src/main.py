@@ -9,6 +9,7 @@ from rich import print
 from rich.rule import Rule
 from sklearn.model_selection import KFold
 from torch import nn, optim
+from torch.optim import lr_scheduler
 from torch.utils import data
 
 import config
@@ -118,11 +119,18 @@ def main():
         model = CatsDogsModel()
         model.apply(reset_model_weights)
 
-        optimizer = optim.Adam(model.parameters(), lr=1e-4)
+        optimizer = optim.Adam(model.parameters(), lr=config.LR)
+        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer=optimizer, T_0=config.COSINE_ANNEALING_T0
+        )
 
         print(Rule("[green bold]Training[/green bold]"))
         train_loss, train_history = train(
-            model=model, data_loader=train_loader, optimizer=optimizer, loss_fn=loss_fn
+            model=model,
+            data_loader=train_loader,
+            optimizer=optimizer,
+            loss_fn=loss_fn,
+            scheduler=scheduler,
         )
 
         print(Rule("[green bold]Validating[/green bold]"))
