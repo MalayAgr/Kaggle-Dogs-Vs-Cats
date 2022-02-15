@@ -1,9 +1,12 @@
 import csv
 import glob
 import os
+from collections import defaultdict
 
 import albumentations as A
 import torch
+from rich import print
+from rich.rule import Rule
 from sklearn.model_selection import KFold
 from torch import nn, optim
 from torch.utils import data
@@ -43,26 +46,34 @@ def dir_to_csv(dir_name, dest):
         )
 
 
-def train(model, data_loader, optimizer, loss_fn, scheduler=None):
+def train(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
+    model.train()
+
+    history = defaultdict(list)
+
     for epoch in range(config.EPOCHS):
-        print(f"Epoch {epoch + 1}")
-        print("-" * 50)
-        loss = train_one_epoch(
+        loss, epoch_history = train_one_epoch(
             model=model,
             data_loader=data_loader,
             optimizer=optimizer,
             loss_fn=loss_fn,
+            epoch_num=epoch,
             scheduler=scheduler,
         )
-        print(f"Training loss at the end of {epoch + 1}: {loss: .3f}")
+        history[f"epoch{epoch + 1}"] = epoch_history
 
-    return loss
+    return loss, history
 
 
-def validate(model, data_loader, loss_fn):
-    for _ in range(config.EPOCHS):
-        loss = validate_one_epoch(model=model, data_loader=data_loader, loss_fn=loss_fn)
-    return loss
+def validate(model: nn.Module, data_loader, loss_fn):
+    model.eval()
+    history = {}
+    for epoch in range(config.EPOCHS):
+        loss, epoch_history = validate_one_epoch(
+            model=model, data_loader=data_loader, loss_fn=loss_fn, epoch_num=epoch
+        )
+        history[f"epoch{epoch + 1}"] = epoch_history
+    return loss, history
 
 
 def main():
@@ -88,9 +99,11 @@ def main():
 
     loss_fn = nn.BCELoss()
 
+    fold_history = {}
+
     for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
-        print(f"Fold {fold + 1}")
-        print("-" * 50)
+        key = fold + 1
+        print(Rule(f"[green bold]Fold {key}[/green bold]"))
 
         train_sampler = data.SubsetRandomSampler(train_ids)
         val_sampler = data.SubsetRandomSampler(val_ids)
@@ -106,14 +119,25 @@ def main():
         model.apply(reset_model_weights)
 
         optimizer = optim.Adam(model.parameters(), lr=1e-4)
-        train_loss = train(
+
+        print(Rule("[green bold]Training[/green bold]"))
+        train_loss, train_history = train(
             model=model, data_loader=train_loader, optimizer=optimizer, loss_fn=loss_fn
         )
 
-        val_loss = validate(model=model, data_loader=val_loader, loss_fn=loss_fn)
+        print(Rule("[green bold]Validating[/green bold]"))
+        val_loss, val_history = validate(
+            model=model, data_loader=val_loader, loss_fn=loss_fn
+        )
 
-        print(f"Train loss: {train_loss: .3f}, Validation loss: {val_loss: .3f}")
+        fold_history[key] = {"train": train_history, "val": val_history}
+
+        msg = f"[green]Train loss: {train_loss: .3f}, Validation loss: {val_loss: .3f}[green]"
+        print(msg)
+
+    return fold_history
 
 
 if __name__ == "__main__":
-    main()
+    history = main()
+    print(history)
