@@ -130,6 +130,9 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
 def main():
     dir_to_csv("train", "train_data.csv")
 
+    if not os.path.exists(config.MODEL_DIR):
+        os.makedir(config.MODEL_DIR)
+
     torch.manual_seed(42)
 
     k_fold = KFold(n_splits=config.FOLDS, shuffle=True)
