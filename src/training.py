@@ -126,4 +126,4 @@ def validate_one_epoch(model: nn.Module, data_loader, loss_fn, epoch_num: int):
             f"Avg. validation loss={avg_loss: .3f}; Accuracy={accuracy * 100: .2f}%"
         )
 
-        return total_loss, history
+        return avg_loss, history
