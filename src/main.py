@@ -1,7 +1,6 @@
 import csv
 import glob
 import os
-from collections import defaultdict
 
 import albumentations as A
 import torch
@@ -50,7 +49,7 @@ def dir_to_csv(dir_name, dest):
 def train(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
     model.train()
 
-    history = defaultdict(list)
+    history = {}
 
     for epoch in range(config.EPOCHS):
         loss, epoch_history = train_one_epoch(
