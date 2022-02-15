@@ -28,6 +28,10 @@ def train_one_step(
     loss.backward()
     optimizer.step()
 
+    if true.is_cuda is True and preds.is_cuda is True:
+        true = true.cpu()
+        preds = preds.cpu()
+
     accuracy = metrics.accuracy_score(
         true.detach().numpy(), preds.detach().numpy() > 0.5
     )
@@ -88,6 +92,10 @@ def validate_one_step(model: nn.Module, data, loss_fn) -> torch.Tensor:
 
     preds = model(image=data["image"])
     loss = loss_fn(preds, true)
+
+    if true.is_cuda is True and preds.is_cuda is True:
+        true = true.cpu()
+        preds = preds.cpu()
 
     accuracy = metrics.accuracy_score(
         true.detach().numpy(), preds.detach().numpy() > 0.5
