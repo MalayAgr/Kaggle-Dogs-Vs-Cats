@@ -96,7 +96,7 @@ def validate_one_epoch(model: nn.Module, data_loader, loss_fn, epoch_num: int):
 
             total_loss += loss.item()
 
-        avg_loss = (total_loss / (batch_index + 1)).item()
+        avg_loss = total_loss / (batch_index + 1)
 
         p_loader.write(f"Avg. validation loss at the end of epoch {avg_loss: .3f}")
 
