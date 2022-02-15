@@ -19,14 +19,6 @@ from model import CatsDogsModel
 from training import train_one_epoch, validate_one_epoch
 
 
-def reset_model_weights(model: nn.Module):
-    for layer in model.children():
-        try:
-            layer.reset_parameters()
-        except AttributeError:
-            pass
-
-
 def dir_to_csv(dir_name, dest):
     path = os.path.join(config.DATA_DIR, dir_name, "*.jpg")
     target = os.path.join(config.DATA_DIR, dest)
@@ -46,6 +38,14 @@ def dir_to_csv(dir_name, dest):
                 for filename in glob.glob(path)
             ]
         )
+
+
+def reset_model_weights(model: nn.Module):
+    for layer in model.children():
+        try:
+            layer.reset_parameters()
+        except AttributeError:
+            pass
 
 
 def train(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
