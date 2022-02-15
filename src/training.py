@@ -5,6 +5,8 @@ from torch import nn
 from torch.optim import Optimizer
 from tqdm import tqdm
 
+import config
+
 
 def train_one_step(
     model: nn.Module,
@@ -13,6 +15,9 @@ def train_one_step(
     loss_fn,
 ) -> torch.Tensor:
     optimizer.zero_grad()
+
+    for key, value in data.items():
+        data[key] = value.to(config.DEVICE)
 
     preds = model(image=data["image"])
     loss = loss_fn(preds, data["label"])
@@ -67,6 +72,9 @@ def train_one_epoch(
 
 
 def validate_one_step(model: nn.Module, data, loss_fn) -> torch.Tensor:
+    for key, value in data.items():
+        data[key] = value.to(config.DEVICE)
+
     preds = model(image=data["image"])
     loss = loss_fn(preds, data["label"])
     return loss

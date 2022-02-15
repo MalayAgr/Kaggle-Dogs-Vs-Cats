@@ -94,6 +94,7 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
     )
 
     model = CatsDogsModel()
+    model.to(config.DEVICE)
     model.apply(reset_model_weights)
 
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
