@@ -79,6 +79,7 @@ def validate(model: nn.Module, data_loader, loss_fn):
 
 def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
     key = fold + 1
+
     print(Rule(f"[green bold]Fold {key}[/green bold]"))
 
     train_sampler = data.SubsetRandomSampler(train_ids)
@@ -108,6 +109,8 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
         loss_fn=loss_fn,
         scheduler=scheduler,
     )
+
+    torch.save(model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}"))
 
     print(Rule("[green bold]Validating[/green bold]"))
 
@@ -149,7 +152,11 @@ def main():
 
     for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
         fold_history[f"fold{fold + 1}"] = train_one_fold(
-            dataset=dataset, loss_fn=loss_fn, train_ids=train_ids, val_ids=val_ids, fold=fold
+            dataset=dataset,
+            loss_fn=loss_fn,
+            train_ids=train_ids,
+            val_ids=val_ids,
+            fold=fold,
         )
 
     return fold_history
