@@ -86,10 +86,19 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
     val_sampler = data.SubsetRandomSampler(val_ids)
 
     train_loader = data.DataLoader(
-        dataset, batch_size=config.BATCH_SIZE, sampler=train_sampler
+        dataset,
+        batch_size=config.BATCH_SIZE,
+        sampler=train_sampler,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
     )
+
     val_loader = data.DataLoader(
-        dataset, batch_size=config.BATCH_SIZE, sampler=val_sampler
+        dataset,
+        batch_size=config.BATCH_SIZE,
+        sampler=val_sampler,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
     )
 
     model = CatsDogsModel()
@@ -111,7 +120,9 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
         scheduler=scheduler,
     )
 
-    torch.save(model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}.pth"))
+    torch.save(
+        model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}.pth")
+    )
 
     print(Rule("[green bold]Validating[/green bold]"))
 
