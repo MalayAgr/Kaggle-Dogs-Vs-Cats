@@ -88,6 +88,7 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
     train_loader = data.DataLoader(
         dataset,
         batch_size=config.BATCH_SIZE,
+        shuffle=True,
         sampler=train_sampler,
         num_workers=config.NUM_WORKERS,
         pin_memory=config.PIN_MEMORY,
@@ -96,6 +97,7 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
     val_loader = data.DataLoader(
         dataset,
         batch_size=config.BATCH_SIZE,
+        shuffle=True,
         sampler=val_sampler,
         num_workers=config.NUM_WORKERS,
         pin_memory=config.PIN_MEMORY,
