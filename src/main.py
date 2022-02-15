@@ -131,7 +131,7 @@ def main():
     dir_to_csv("train", "train_data.csv")
 
     if not os.path.exists(config.MODEL_DIR):
-        os.makedir(config.MODEL_DIR)
+        os.mkdir(config.MODEL_DIR)
 
     torch.manual_seed(42)
 
