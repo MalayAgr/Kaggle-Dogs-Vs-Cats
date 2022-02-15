@@ -77,6 +77,51 @@ def validate(model: nn.Module, data_loader, loss_fn):
     return loss, history
 
 
+def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
+    key = fold + 1
+    print(Rule(f"[green bold]Fold {key}[/green bold]"))
+
+    train_sampler = data.SubsetRandomSampler(train_ids)
+    val_sampler = data.SubsetRandomSampler(val_ids)
+
+    train_loader = data.DataLoader(
+        dataset, batch_size=config.BATCH_SIZE, sampler=train_sampler
+    )
+    val_loader = data.DataLoader(
+        dataset, batch_size=config.BATCH_SIZE, sampler=val_sampler
+    )
+
+    model = CatsDogsModel()
+    model.apply(reset_model_weights)
+
+    optimizer = optim.Adam(model.parameters(), lr=config.LR)
+    scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer=optimizer, T_0=config.COSINE_ANNEALING_T0
+    )
+
+    print(Rule("[green bold]Training[/green bold]"))
+
+    train_loss, train_history = train(
+        model=model,
+        data_loader=train_loader,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
+        scheduler=scheduler,
+    )
+
+    print(Rule("[green bold]Validating[/green bold]"))
+
+    val_loss, val_history = validate(
+        model=model, data_loader=val_loader, loss_fn=loss_fn
+    )
+
+    print(
+        f"[green]Train loss: {train_loss: .3f}, Validation loss: {val_loss: .3f}[green]"
+    )
+
+    return {"train": train_history, "val": val_history}
+
+
 def main():
     dir_to_csv("train", "train_data.csv")
 
@@ -103,45 +148,9 @@ def main():
     fold_history = {}
 
     for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
-        key = fold + 1
-        print(Rule(f"[green bold]Fold {key}[/green bold]"))
-
-        train_sampler = data.SubsetRandomSampler(train_ids)
-        val_sampler = data.SubsetRandomSampler(val_ids)
-
-        train_loader = data.DataLoader(
-            dataset, batch_size=config.BATCH_SIZE, sampler=train_sampler
+        fold_history[f"fold{fold + 1}"] = train_one_fold(
+            dataset=dataset, loss_fn=loss_fn, train_ids=train_ids, val_ids=val_ids, fold=fold
         )
-        val_loader = data.DataLoader(
-            dataset, batch_size=config.BATCH_SIZE, sampler=val_sampler
-        )
-
-        model = CatsDogsModel()
-        model.apply(reset_model_weights)
-
-        optimizer = optim.Adam(model.parameters(), lr=config.LR)
-        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
-            optimizer=optimizer, T_0=config.COSINE_ANNEALING_T0
-        )
-
-        print(Rule("[green bold]Training[/green bold]"))
-        train_loss, train_history = train(
-            model=model,
-            data_loader=train_loader,
-            optimizer=optimizer,
-            loss_fn=loss_fn,
-            scheduler=scheduler,
-        )
-
-        print(Rule("[green bold]Validating[/green bold]"))
-        val_loss, val_history = validate(
-            model=model, data_loader=val_loader, loss_fn=loss_fn
-        )
-
-        fold_history[key] = {"train": train_history, "val": val_history}
-
-        msg = f"[green]Train loss: {train_loss: .3f}, Validation loss: {val_loss: .3f}[green]"
-        print(msg)
 
     return fold_history
 
