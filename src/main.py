@@ -11,7 +11,7 @@ from torch.utils import data
 import config
 from dataset import CatsDogsDataset
 from model import CatsDogsModel
-from training import train_one_epoch
+from training import train_one_epoch, validate_one_epoch
 
 
 def reset_model_weights(model: nn.Module):
@@ -43,15 +43,26 @@ def dir_to_csv(dir_name, dest):
         )
 
 
-def train(model, data_loader, optimizer, scheduler=None):
+def train(model, data_loader, optimizer, loss_fn, scheduler=None):
     for epoch in range(config.EPOCHS):
+        print(f"Epoch {epoch + 1}")
+        print("-" * 50)
         loss = train_one_epoch(
             model=model,
             data_loader=data_loader,
             optimizer=optimizer,
+            loss_fn=loss_fn,
             scheduler=scheduler,
         )
-        print(f"Loss at the end of {epoch + 1}: {loss: .3f}")
+        print(f"Training loss at the end of {epoch + 1}: {loss: .3f}")
+
+    return loss
+
+
+def validate(model, data_loader, loss_fn):
+    for _ in range(config.EPOCHS):
+        loss = validate_one_epoch(model=model, data_loader=data_loader, loss_fn=loss_fn)
+    return loss
 
 
 def main():
@@ -75,9 +86,11 @@ def main():
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
     )
 
+    loss_fn = nn.BCELoss()
+
     for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
         print(f"Fold {fold + 1}")
-        print("-" * 10)
+        print("-" * 50)
 
         train_sampler = data.SubsetRandomSampler(train_ids)
         val_sampler = data.SubsetRandomSampler(val_ids)
@@ -93,7 +106,13 @@ def main():
         model.apply(reset_model_weights)
 
         optimizer = optim.Adam(model.parameters(), lr=1e-4)
-        loss = train(model=model, data_loader=train_loader, optimizer=optimizer)
+        train_loss = train(
+            model=model, data_loader=train_loader, optimizer=optimizer, loss_fn=loss_fn
+        )
+
+        val_loss = validate(model=model, data_loader=val_loader, loss_fn=loss_fn)
+
+        print(f"Train loss: {train_loss: .3f}, Validation loss: {val_loss: .3f}")
 
 
 if __name__ == "__main__":

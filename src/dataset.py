@@ -38,4 +38,4 @@ class CatsDogsDataset(Dataset):
         img = np.transpose(img, axes=(-1, 0, 1))
         img = torch.tensor(img)
 
-        return {"image": img, "label": label}
+        return {"image": img, "label": torch.tensor(label, dtype=torch.float32)}
