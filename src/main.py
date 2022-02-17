@@ -205,10 +205,6 @@ def make_inference():
 
     num_samples = len(test_data)
 
-    data_loader = data.DataLoader(
-        test_data, batch_size=num_samples, num_workers=config.NUM_WORKERS
-    )
-
     model_loader = (
         functools.partial(torch.load, map_location="cpu")
         if torch.cuda.is_available() is False
@@ -221,6 +217,13 @@ def make_inference():
         state_dict = model_loader(model_path)
         model.load_state_dict(state_dict)
         model.eval()
+
+        data_loader = data.DataLoader(
+            test_data,
+            batch_size=num_samples,
+            num_workers=config.NUM_WORKERS,
+            pin_memory=config.PIN_MEMORY,
+        )
 
         batch = next(iter(data_loader))
         preds = model(batch["image"])
