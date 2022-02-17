@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 import numpy as np
 import pandas as pd
 import torch
@@ -9,10 +8,13 @@ from torch.utils.data import Dataset
 
 
 class CatsDogsDataset(Dataset):
-    def __init__(self, csv, transform=None, resize: tuple[int, int] = None):
+    def __init__(
+        self, csv, transform=None, resize: tuple[int, int] = None, labels=True
+    ):
         self.df: pd.DataFrame = pd.read_csv(csv)
         self.transform = transform
         self.resize = resize
+        self.labels = labels
 
     def __len__(self):
         return len(self.df)
@@ -20,7 +22,6 @@ class CatsDogsDataset(Dataset):
     def __getitem__(self, idx):
         # Load image path and label
         img = self.df.iloc[idx, 0]
-        label = self.df.iloc[idx, 1]
 
         # Read image
         img = Image.open(img)
@@ -41,4 +42,11 @@ class CatsDogsDataset(Dataset):
         img = np.transpose(img, axes=(-1, 0, 1))
         img = torch.tensor(img)
 
-        return {"image": img, "label": torch.tensor(label, dtype=torch.float32)}
+        sample = {"image": img}
+
+        # Add label to sample if required
+        if self.labels is True:
+            label = self.df.iloc[idx, 1]
+            sample["label"] = torch.tensor(label, dtype=torch.float32)
+
+        return sample
