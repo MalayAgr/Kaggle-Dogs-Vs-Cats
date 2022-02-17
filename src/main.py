@@ -203,6 +203,9 @@ def make_inference():
         labels=False,
     )
 
+    images = test_data[:]
+    images = torch.tensor([image["image"] for image in images])
+
     num_samples = len(test_data)
 
     model_loader = (
@@ -219,6 +222,7 @@ def make_inference():
         model.eval()
 
         images = test_data[:]
+
         preds = model(image=images)
 
         df = pd.DataFrame()
