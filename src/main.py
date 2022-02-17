@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import csv
+import functools
 import glob
+import io
 import os
+import pickle
 
 import albumentations as A
+import pandas as pd
 import torch
 from rich import print
 from rich.rule import Rule
@@ -19,25 +23,41 @@ from model import CatsDogsModel
 from training import train_one_epoch, validate_one_epoch
 
 
-def dir_to_csv(dir_name, dest):
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == "torch.storage" and name == "_load_from_bytes":
+            return lambda b: torch.load(io.BytesIO(b), map_location="cpu")
+        else:
+            return super().find_class(module, name)
+
+
+def dir_to_csv(dir_name, dest, has_labels=True):
+    def with_labels(path):
+        label_map = config.LABEL_MAP
+        yield from (
+            {
+                "filename": filename,
+                "label": label_map["cat" if "cat" in filename else "dog"],
+            }
+            for filename in glob.glob(path)
+        )
+
     path = os.path.join(config.DATA_DIR, dir_name, "*.jpg")
     target = os.path.join(config.DATA_DIR, dest)
 
     with open(target, mode="w+") as f:
-        writer = csv.DictWriter(f, fieldnames=["filename", "label"])
+
+        fieldnames = ["filename"]
+
+        if has_labels is True:
+            fieldnames.append("label")
+            rows = with_labels(path)
+        else:
+            rows = ({"filename": filename} for filename in glob.glob(path))
+
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-
-        label_map = config.LABEL_MAP
-
-        writer.writerows(
-            [
-                {
-                    "filename": filename,
-                    "label": label_map["cat" if "cat" in filename else "dog"],
-                }
-                for filename in glob.glob(path)
-            ]
-        )
+        writer.writerows(rows)
 
 
 def reset_model_weights(model: nn.Module):
@@ -48,7 +68,7 @@ def reset_model_weights(model: nn.Module):
             pass
 
 
-def train(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
+def train_loop(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
     model.train()
 
     history = {}
@@ -67,7 +87,7 @@ def train(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
     return loss, history
 
 
-def validate(model: nn.Module, data_loader, loss_fn):
+def validation_loop(model: nn.Module, data_loader, loss_fn):
     model.eval()
     history = {}
     loss, epoch_history = validate_one_epoch(
@@ -112,7 +132,7 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
 
     print(Rule("[green bold]Training[/green bold]"))
 
-    train_loss, train_history = train(
+    train_loss, train_history = train_loop(
         model=model,
         data_loader=train_loader,
         optimizer=optimizer,
@@ -126,7 +146,7 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
 
     print(Rule("[green bold]Validating[/green bold]"))
 
-    val_loss, val_history = validate(
+    val_loss, val_history = validation_loop(
         model=model, data_loader=val_loader, loss_fn=loss_fn
     )
 
@@ -137,14 +157,7 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
     return {"train": train_history, "val": val_history}
 
 
-def main():
-    dir_to_csv("train", "train_data.csv")
-
-    if not os.path.exists(config.MODEL_DIR):
-        os.mkdir(config.MODEL_DIR)
-
-    torch.manual_seed(42)
-
+def train():
     k_fold = KFold(n_splits=config.FOLDS, shuffle=True)
 
     transform = A.Compose(
@@ -177,6 +190,76 @@ def main():
     return fold_history
 
 
+def make_inference():
+    if not os.path.exists("inferences"):
+        os.mkdir("inferences")
+
+    transform = A.Compose([A.Normalize()])
+
+    test_data = CatsDogsDataset(
+        "data/test_data.csv",
+        transform=transform,
+        resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
+        labels=False,
+    )
+
+    num_samples = len(test_data)
+
+    data_loader = data.DataLoader(
+        test_data, batch_size=num_samples, num_workers=config.NUM_WORKERS
+    )
+
+    model_loader = (
+        functools.partial(torch.load, map_location="cpu")
+        if torch.cuda.is_available() is False
+        else torch.load
+    )
+
+    for fold, model_path in enumerate(glob.glob("models/*.pth")):
+        model = CatsDogsModel()
+
+        state_dict = model_loader(model_path)
+        model.load_state_dict(state_dict)
+        model.eval()
+
+        batch = next(iter(data_loader))
+        preds = model(batch["image"])
+
+        df = pd.DataFrame()
+        df["id"] = range(1, num_samples + 1)
+        df["label"] = (preds > 0.5).numpy()
+
+        df.to_csv(f"inferences/model-{fold + 1}.csv", index=False)
+
+
+def main():
+    # dir_to_csv("train", "train_data.csv")
+
+    # if not os.path.exists(config.MODEL_DIR):
+    #     os.mkdir(config.MODEL_DIR)
+
+    # torch.manual_seed(42)
+
+    # history = train()
+    # print(history)
+
+    dir_to_csv("test1", "test_data.csv", has_labels=False)
+
+    df: pd.DataFrame = pd.read_csv("data/test_data.csv")
+
+    target_names = []
+    for filename in df["filename"]:
+        basename = os.path.basename(filename)
+        name, _ = os.path.splitext(basename)
+        target_names.append(int(name))
+
+    df["target_name"] = target_names
+    df = df.sort_values(by=["target_name"])
+    df = df.drop("target_name", axis=1)
+    df.to_csv("data/test_data.csv", index=False)
+
+    make_inference()
+
+
 if __name__ == "__main__":
-    history = main()
-    print(history)
+    main()
