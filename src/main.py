@@ -3,9 +3,8 @@ from __future__ import annotations
 import csv
 import functools
 import glob
-import io
 import os
-import pickle
+from collections import defaultdict
 
 import albumentations as A
 import pandas as pd
@@ -22,13 +21,6 @@ from dataset import CatsDogsDataset
 from model import CatsDogsModel
 from training import train_one_epoch, validate_one_epoch
 
-
-class CPU_Unpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        if module == "torch.storage" and name == "_load_from_bytes":
-            return lambda b: torch.load(io.BytesIO(b), map_location="cpu")
-        else:
-            return super().find_class(module, name)
 
 
 def dir_to_csv(dir_name, dest, has_labels=True):
@@ -194,7 +186,7 @@ def make_inference():
     if not os.path.exists("inferences"):
         os.mkdir("inferences")
 
-    transform = A.Compose([A.Normalize()])
+    transform = A.Compose([A.Normalize(always_apply=True)])
 
     test_data = CatsDogsDataset(
         "data/test_data.csv",
@@ -202,11 +194,6 @@ def make_inference():
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
         labels=False,
     )
-
-    images = test_data[:]
-    images = torch.tensor([image["image"] for image in images])
-
-    num_samples = len(test_data)
 
     model_loader = (
         functools.partial(torch.load, map_location="cpu")
@@ -219,29 +206,35 @@ def make_inference():
 
         state_dict = model_loader(model_path)
         model.load_state_dict(state_dict)
+        model.to(config.DEVICE)
         model.eval()
 
-        images = test_data[:]
+        data_loader = data.DataLoader(test_data)
 
-        preds = model(image=images)
+        df_dict = defaultdict(list)
 
-        df = pd.DataFrame()
-        df["id"] = range(1, num_samples + 1)
-        df["label"] = (preds > 0.5).numpy()
+        for idx, batch in enumerate(data_loader, 1):
+            for k, v in batch.items():
+                batch[k] = v.to(config.DEVICE)
 
-        df.to_csv(f"inferences/model-{fold + 1}.csv", index=False)
+            preds = model(image=batch["image"])
+
+            df_dict["id"].append(idx)
+            df_dict["label"].append((preds > 0.5).item())
+
+        df = pd.DataFrame.from_dict(df_dict)
+        df.to_csv(f"inferences/model-fold{fold + 1}.csv", index=False)
 
 
 def main():
-    # dir_to_csv("train", "train_data.csv")
+    dir_to_csv("train", "train_data.csv")
 
-    # if not os.path.exists(config.MODEL_DIR):
-    #     os.mkdir(config.MODEL_DIR)
+    if not os.path.exists(config.MODEL_DIR):
+        os.mkdir(config.MODEL_DIR)
 
-    # torch.manual_seed(42)
+    torch.manual_seed(42)
 
-    # history = train()
-    # print(history)
+    history = train()
 
     dir_to_csv("test1", "test_data.csv", has_labels=False)
 
