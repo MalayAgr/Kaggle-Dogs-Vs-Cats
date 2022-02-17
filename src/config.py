@@ -11,4 +11,5 @@ FOLDS = 5
 COSINE_ANNEALING_T0 = 10
 LR = 1e-3
 MODEL_DIR = "models"
+INFERENCE_DIR = "inferences"
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

@@ -22,7 +22,6 @@ from model import CatsDogsModel
 from training import train_one_epoch, validate_one_epoch
 
 
-
 def dir_to_csv(dir_name, dest, has_labels=True):
     def with_labels(path):
         label_map = config.LABEL_MAP
@@ -50,6 +49,32 @@ def dir_to_csv(dir_name, dest, has_labels=True):
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def order_test_data(csv_path):
+    path = os.path.join(config.DATA_DIR, csv_path)
+
+    df: pd.DataFrame = pd.read_csv(path)
+
+    target_names = []
+
+    for filename in df["filename"]:
+        # Take out filename from full path
+        basename = os.path.basename(filename)
+
+        # Remove extension
+        name, _ = os.path.splitext(basename)
+
+        target_names.append(int(name))
+
+    df["target_name"] = target_names
+
+    # Sort by IDs
+    df = df.sort_values(by=["target_name"])
+    df = df.drop("target_name", axis=1)
+
+    # Overwrite existing file
+    df.to_csv(path, index=False)
 
 
 def reset_model_weights(model: nn.Module):
@@ -183,9 +208,6 @@ def train():
 
 
 def make_inference():
-    if not os.path.exists("inferences"):
-        os.mkdir("inferences")
-
     transform = A.Compose([A.Normalize(always_apply=True)])
 
     test_data = CatsDogsDataset(
@@ -228,29 +250,18 @@ def make_inference():
 
 def main():
     dir_to_csv("train", "train_data.csv")
+    dir_to_csv("test1", "test_data.csv", has_labels=False)
+    order_test_data("test_data.csv")
 
     if not os.path.exists(config.MODEL_DIR):
         os.mkdir(config.MODEL_DIR)
 
+    if not os.path.exists(config.INFERENCE_DIR):
+        os.mkdir(config.INFERENCE_DIR)
+
     torch.manual_seed(42)
 
     history = train()
-
-    dir_to_csv("test1", "test_data.csv", has_labels=False)
-
-    df: pd.DataFrame = pd.read_csv("data/test_data.csv")
-
-    target_names = []
-    for filename in df["filename"]:
-        basename = os.path.basename(filename)
-        name, _ = os.path.splitext(basename)
-        target_names.append(int(name))
-
-    df["target_name"] = target_names
-    df = df.sort_values(by=["target_name"])
-    df = df.drop("target_name", axis=1)
-    df.to_csv("data/test_data.csv", index=False)
-
     make_inference()
 
 
