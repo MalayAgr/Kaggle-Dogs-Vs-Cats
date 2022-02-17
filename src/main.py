@@ -218,14 +218,8 @@ def make_inference():
         model.load_state_dict(state_dict)
         model.eval()
 
-        data_loader = data.DataLoader(
-            test_data,
-            num_workers=config.NUM_WORKERS,
-            pin_memory=config.PIN_MEMORY,
-        )
-
-        batch = next(iter(data_loader))
-        preds = model(batch["image"])
+        images = test_data[:]
+        preds = model(image=images)
 
         df = pd.DataFrame()
         df["id"] = range(1, num_samples + 1)
