@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import torch
 from torch import nn
 
 
@@ -36,5 +37,5 @@ class CatsDogsModel(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, image):
+    def forward(self, image) -> torch.Tensor:
         return self.layers(image).squeeze(1)
