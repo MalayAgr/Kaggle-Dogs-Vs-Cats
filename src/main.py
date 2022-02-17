@@ -220,7 +220,6 @@ def make_inference():
 
         data_loader = data.DataLoader(
             test_data,
-            batch_size=num_samples,
             num_workers=config.NUM_WORKERS,
             pin_memory=config.PIN_MEMORY,
         )
