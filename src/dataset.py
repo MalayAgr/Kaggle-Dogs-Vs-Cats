@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import csv
+import glob
+import os
+
 import numpy as np
 import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+
+import config
 
 
 class CatsDogsDataset(Dataset):
@@ -50,3 +56,58 @@ class CatsDogsDataset(Dataset):
             sample["label"] = torch.tensor(label, dtype=torch.float32)
 
         return sample
+
+
+def dir_to_csv(dir_name, dest, has_labels=True):
+    def with_labels(path):
+        label_map = config.LABEL_MAP
+        yield from (
+            {
+                "filename": filename,
+                "label": label_map["cat" if "cat" in filename else "dog"],
+            }
+            for filename in glob.glob(path)
+        )
+
+    path = os.path.join(config.DATA_DIR, dir_name, "*.jpg")
+    target = os.path.join(config.DATA_DIR, dest)
+
+    with open(target, mode="w+") as f:
+
+        fieldnames = ["filename"]
+
+        if has_labels is True:
+            fieldnames.append("label")
+            rows = with_labels(path)
+        else:
+            rows = ({"filename": filename} for filename in glob.glob(path))
+
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def order_test_data(csv_path):
+    path = os.path.join(config.DATA_DIR, csv_path)
+
+    df: pd.DataFrame = pd.read_csv(path)
+
+    target_names = []
+
+    for filename in df["filename"]:
+        # Take out filename from full path
+        basename = os.path.basename(filename)
+
+        # Remove extension
+        name, _ = os.path.splitext(basename)
+
+        target_names.append(int(name))
+
+    df["target_name"] = target_names
+
+    # Sort by IDs
+    df = df.sort_values(by=["target_name"])
+    df = df.drop("target_name", axis=1)
+
+    # Overwrite existing file
+    df.to_csv(path, index=False)

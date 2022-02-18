@@ -39,3 +39,11 @@ class CatsDogsModel(nn.Module):
 
     def forward(self, image) -> torch.Tensor:
         return self.layers(image).squeeze(1)
+
+
+def reset_model_weights(model: nn.Module):
+    for layer in model.children():
+        try:
+            layer.reset_parameters()
+        except AttributeError:
+            pass

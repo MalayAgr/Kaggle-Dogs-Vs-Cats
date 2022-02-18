@@ -17,101 +17,9 @@ from torch.optim import lr_scheduler
 from torch.utils import data
 
 import config
-from dataset import CatsDogsDataset
-from model import CatsDogsModel
-from training import train_one_epoch, validate_one_epoch
-
-
-def dir_to_csv(dir_name, dest, has_labels=True):
-    def with_labels(path):
-        label_map = config.LABEL_MAP
-        yield from (
-            {
-                "filename": filename,
-                "label": label_map["cat" if "cat" in filename else "dog"],
-            }
-            for filename in glob.glob(path)
-        )
-
-    path = os.path.join(config.DATA_DIR, dir_name, "*.jpg")
-    target = os.path.join(config.DATA_DIR, dest)
-
-    with open(target, mode="w+") as f:
-
-        fieldnames = ["filename"]
-
-        if has_labels is True:
-            fieldnames.append("label")
-            rows = with_labels(path)
-        else:
-            rows = ({"filename": filename} for filename in glob.glob(path))
-
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def order_test_data(csv_path):
-    path = os.path.join(config.DATA_DIR, csv_path)
-
-    df: pd.DataFrame = pd.read_csv(path)
-
-    target_names = []
-
-    for filename in df["filename"]:
-        # Take out filename from full path
-        basename = os.path.basename(filename)
-
-        # Remove extension
-        name, _ = os.path.splitext(basename)
-
-        target_names.append(int(name))
-
-    df["target_name"] = target_names
-
-    # Sort by IDs
-    df = df.sort_values(by=["target_name"])
-    df = df.drop("target_name", axis=1)
-
-    # Overwrite existing file
-    df.to_csv(path, index=False)
-
-
-def reset_model_weights(model: nn.Module):
-    for layer in model.children():
-        try:
-            layer.reset_parameters()
-        except AttributeError:
-            pass
-
-
-def train_loop(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
-    model.train()
-
-    history = {}
-
-    for epoch in range(config.EPOCHS):
-        loss, epoch_history = train_one_epoch(
-            model=model,
-            data_loader=data_loader,
-            optimizer=optimizer,
-            loss_fn=loss_fn,
-            epoch_num=epoch,
-            scheduler=scheduler,
-        )
-        history[f"epoch{epoch + 1}"] = epoch_history
-
-    return loss, history
-
-
-def validation_loop(model: nn.Module, data_loader, loss_fn):
-    model.eval()
-    history = {}
-    loss, epoch_history = validate_one_epoch(
-        model=model, data_loader=data_loader, loss_fn=loss_fn, epoch_num=0
-    )
-    history[f"epoch1"] = epoch_history
-    return loss, history
+import dataset as ds
+import model as mod
+import training as tr
 
 
 def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
@@ -138,9 +46,9 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
         pin_memory=config.PIN_MEMORY,
     )
 
-    model = CatsDogsModel()
+    model = mod.CatsDogsModel()
     model.to(config.DEVICE)
-    model.apply(reset_model_weights)
+    model.apply(mod.reset_model_weights)
 
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
     scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
@@ -149,7 +57,7 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
 
     print(Rule("[green bold]Training[/green bold]"))
 
-    train_loss, train_history = train_loop(
+    train_loss, train_history = tr.train_loop(
         model=model,
         data_loader=train_loader,
         optimizer=optimizer,
@@ -157,13 +65,11 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
         scheduler=scheduler,
     )
 
-    torch.save(
-        model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}.pth")
-    )
+    torch.save(model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}.pth"))
 
     print(Rule("[green bold]Validating[/green bold]"))
 
-    val_loss, val_history = validation_loop(
+    val_loss, val_history = tr.validation_loop(
         model=model, data_loader=val_loader, loss_fn=loss_fn
     )
 
@@ -185,7 +91,7 @@ def train():
         ]
     )
 
-    dataset = CatsDogsDataset(
+    dataset = ds.CatsDogsDataset(
         csv="data/train_data.csv",
         transform=transform,
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
@@ -210,7 +116,7 @@ def train():
 def make_inference():
     transform = A.Compose([A.Normalize(always_apply=True)])
 
-    test_data = CatsDogsDataset(
+    test_data = ds.CatsDogsDataset(
         "data/test_data.csv",
         transform=transform,
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
@@ -224,7 +130,7 @@ def make_inference():
     )
 
     for fold, model_path in enumerate(glob.glob("models/*.pth")):
-        model = CatsDogsModel()
+        model = mod.CatsDogsModel()
 
         state_dict = model_loader(model_path)
         model.load_state_dict(state_dict)
@@ -249,9 +155,9 @@ def make_inference():
 
 
 def main():
-    dir_to_csv("train", "train_data.csv")
-    dir_to_csv("test1", "test_data.csv", has_labels=False)
-    order_test_data("test_data.csv")
+    ds.dir_to_csv("train", "train_data.csv")
+    ds.dir_to_csv("test1", "test_data.csv", has_labels=False)
+    ds.order_test_data("test_data.csv")
 
     if not os.path.exists(config.MODEL_DIR):
         os.mkdir(config.MODEL_DIR)

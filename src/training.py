@@ -127,3 +127,32 @@ def validate_one_epoch(model: nn.Module, data_loader, loss_fn, epoch_num: int):
         )
 
         return avg_loss, history
+
+
+def train_loop(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
+    model.train()
+
+    history = {}
+
+    for epoch in range(config.EPOCHS):
+        loss, epoch_history = train_one_epoch(
+            model=model,
+            data_loader=data_loader,
+            optimizer=optimizer,
+            loss_fn=loss_fn,
+            epoch_num=epoch,
+            scheduler=scheduler,
+        )
+        history[f"epoch{epoch + 1}"] = epoch_history
+
+    return loss, history
+
+
+def validation_loop(model: nn.Module, data_loader, loss_fn):
+    model.eval()
+    history = {}
+    loss, epoch_history = validate_one_epoch(
+        model=model, data_loader=data_loader, loss_fn=loss_fn, epoch_num=0
+    )
+    history[f"epoch1"] = epoch_history
+    return loss, history
