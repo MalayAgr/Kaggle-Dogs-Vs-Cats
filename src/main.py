@@ -65,7 +65,9 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
         scheduler=scheduler,
     )
 
-    torch.save(model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}.pth"))
+    torch.save(
+        model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}.pth")
+    )
 
     print(Rule("[green bold]Validating[/green bold]"))
 
@@ -168,7 +170,7 @@ def main():
     torch.manual_seed(42)
 
     history = train()
-    make_inference()
+    return history
 
 
 if __name__ == "__main__":
