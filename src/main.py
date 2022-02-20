@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import functools
 import glob
 import os
@@ -10,7 +9,7 @@ import albumentations as A
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 from torch import nn, optim
 from torch.optim import lr_scheduler
 from torch.utils import data
@@ -101,7 +100,7 @@ def train_one_fold(
 
 
 def train():
-    k_fold = KFold(n_splits=config.FOLDS, shuffle=True)
+    skf = StratifiedKFold(n_splits=config.FOLDS, shuffle=True, random_state=42)
 
     transform = A.Compose(
         [
@@ -119,7 +118,7 @@ def train():
 
     fold_history = {}
 
-    for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
+    for fold, (train_ids, val_ids) in enumerate(skf.split(dataset)):
         fold_history[f"fold{fold + 1}"] = train_one_fold(
             dataset=dataset,
             train_ids=train_ids,
