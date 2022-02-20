@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+
+import numpy as np
 import torch
 from sklearn import metrics
 from torch import nn
@@ -9,150 +12,123 @@ from tqdm import tqdm
 import config
 
 
-def train_one_step(
-    model: nn.Module,
-    data,
-    optimizer: Optimizer,
-    loss_fn,
-) -> torch.Tensor:
-    optimizer.zero_grad()
+class Engine:
+    def __init__(self, model: nn.Module, optimizer: Optimizer, scheduler=None) -> None:
+        self.model = model
+        self.optimizer = optimizer
+        self.scheduler = scheduler
 
-    for key, value in data.items():
-        data[key] = value.to(config.DEVICE)
+    @staticmethod
+    def loss_fn(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        fn = nn.BCELoss()
+        return fn(y_pred, y_true)
 
-    true = data["label"]
+    @staticmethod
+    def accuracy(y_pred: torch.Tensor, y_true: torch.Tensor) -> float:
+        if y_true.is_cuda is True and y_pred.is_cuda is True:
+            y_true = y_true.cpu()
+            y_pred = y_pred.cpu()
 
-    preds = model(image=data["image"])
-    loss = loss_fn(preds, true)
+        y_true = y_true.detach().numpy()
+        y_pred = y_pred.detach().numpy() > 0.5
 
-    loss.backward()
-    optimizer.step()
+        return metrics.accuracy_score(y_true, y_pred)
 
-    if true.is_cuda is True and preds.is_cuda is True:
-        true = true.cpu()
-        preds = preds.cpu()
+    def reset_model_weights(self):
+        for layer in self.model.children():
+            try:
+                layer.reset_parameters()
+            except AttributeError:
+                pass
 
-    accuracy = metrics.accuracy_score(
-        true.detach().numpy(), preds.detach().numpy() > 0.5
-    )
+    def save_model(self, filename: str) -> None:
+        path = os.path.join(config.MODEL_DIR, filename)
+        torch.save(self.model.state_dict(), path)
 
-    return loss, accuracy
+    def _train_one_step(self, data) -> tuple[torch.Tensor, float]:
+        for key, value in data.items():
+            data[key] = value.to(config.DEVICE)
 
+        preds = self.model(image=data["image"])
 
-def train_one_epoch(
-    model: nn.Module,
-    data_loader,
-    optimizer: Optimizer,
-    loss_fn,
-    epoch_num: int,
-    scheduler=None,
-):
-    total_loss = 0.0
-    history = []
+        true = data["label"]
+        loss = self.loss_fn(preds, true)
 
-    iters = len(data_loader)
+        loss.backward()
+        self.optimizer.step()
 
-    with tqdm(data_loader, unit="batch", desc=f"Epoch {epoch_num + 1}") as p_loader:
-        for batch_index, data in enumerate(p_loader):
-            loss, accuracy = train_one_step(
-                model=model, data=data, optimizer=optimizer, loss_fn=loss_fn
-            )
+        accuracy = self.accuracy(preds, true)
 
-            postfix = {"loss": loss.item(), "accuracy": f"{accuracy * 100: .2f}%"}
+        return loss, accuracy
 
-            postfix["lr"] = (
-                scheduler.get_last_lr()[0]
-                if scheduler is not None
-                else optimizer.param_groups[0]["lr"]
-            )
+    def train(self, data_loader, epoch_num=0) -> tuple[float, float]:
+        self.model.train()
 
-            p_loader.set_postfix(postfix)
+        optimizer = self.optimizer
+        scheduler = self.scheduler
 
-            history.append(loss.item())
+        total_loss = accuracy = 0.0
+        iters = len(data_loader)
 
-            total_loss += loss.item()
+        with tqdm(data_loader, unit="batch", desc="Training") as p_loader:
+            for batch_index, data in enumerate(p_loader):
+                optimizer.zero_grad()
 
-            if scheduler is not None:
-                scheduler.step(epoch_num + batch_index / iters)
+                loss, accuracy = self._train_one_step(data=data)
 
-        avg_loss = total_loss / (batch_index + 1)
+                loss = loss.item()
+                accuracy_per = accuracy * 100
 
-        p_loader.write(
-            f"Avg. training loss={avg_loss: .3f}; Training accuracy={accuracy * 100: .2f}%"
-        )
+                postfix = {"loss": loss, "accuracy": f"{accuracy_per: .2f}%"}
 
-        return avg_loss, history
+                postfix["lr"] = (
+                    scheduler.get_last_lr()[0]
+                    if scheduler is not None
+                    else optimizer.param_groups[0]["lr"]
+                )
 
+                p_loader.set_postfix(postfix)
 
-def validate_one_step(model: nn.Module, data, loss_fn) -> torch.Tensor:
-    for key, value in data.items():
-        data[key] = value.to(config.DEVICE)
+                total_loss += loss
 
-    true = data["label"]
+                if scheduler is not None:
+                    scheduler.step(epoch_num + batch_index / iters)
 
-    preds = model(image=data["image"])
-    loss = loss_fn(preds, true)
+            avg_loss = total_loss / (batch_index + 1)
 
-    if true.is_cuda is True and preds.is_cuda is True:
-        true = true.cpu()
-        preds = preds.cpu()
+            return avg_loss, accuracy
 
-    accuracy = metrics.accuracy_score(
-        true.detach().numpy(), preds.detach().numpy() > 0.5
-    )
+    def _evaluate_one_step(self, data) -> tuple[torch.Tensor, float]:
+        for key, value in data.items():
+            data[key] = value.to(config.DEVICE)
 
-    return loss, accuracy
+        preds = self.model(image=data["image"])
 
+        true = data["label"]
+        loss = self.loss_fn(preds, true)
+        accuracy = self.accuracy(preds, true)
 
-def validate_one_epoch(model: nn.Module, data_loader, loss_fn, epoch_num: int):
-    total_loss = 0.0
-    history = []
+        return loss, accuracy
 
-    with tqdm(data_loader, unit="batch", desc=f"Epoch {epoch_num + 1}") as p_loader:
-        for batch_index, data in enumerate(p_loader):
+    def evaluate(self, data_loader) -> tuple[float, float]:
+        self.model.eval()
 
-            with torch.no_grad():
-                loss, accuracy = validate_one_step(model, data, loss_fn=loss_fn)
+        total_loss = accuracy = 0.0
 
-            p_loader.set_postfix(loss=loss.item(), accuracy=f"{accuracy * 100: .2f}%")
+        with tqdm(data_loader, unit="batch", desc="Validation") as p_loader:
+            for batch_index, data in enumerate(p_loader):
+                with torch.no_grad():
+                    loss, accuracy = self._evaluate_one_step(data=data)
 
-            history.append(loss.item())
+                loss = loss.item()
+                accuracy_per = accuracy * 100
 
-            total_loss += loss.item()
+                postfix = {"loss": loss, "accuracy": f"{accuracy_per: .2f}%"}
 
-        avg_loss = total_loss / (batch_index + 1)
+                p_loader.set_postfix(postfix)
 
-        p_loader.write(
-            f"Avg. validation loss={avg_loss: .3f}; Accuracy={accuracy * 100: .2f}%"
-        )
+                total_loss += loss
 
-        return avg_loss, history
+            avg_loss = total_loss / (batch_index + 1)
 
-
-def train_loop(model: nn.Module, data_loader, optimizer, loss_fn, scheduler=None):
-    model.train()
-
-    history = {}
-
-    for epoch in range(config.EPOCHS):
-        loss, epoch_history = train_one_epoch(
-            model=model,
-            data_loader=data_loader,
-            optimizer=optimizer,
-            loss_fn=loss_fn,
-            epoch_num=epoch,
-            scheduler=scheduler,
-        )
-        history[f"epoch{epoch + 1}"] = epoch_history
-
-    return loss, history
-
-
-def validation_loop(model: nn.Module, data_loader, loss_fn):
-    model.eval()
-    history = {}
-    loss, epoch_history = validate_one_epoch(
-        model=model, data_loader=data_loader, loss_fn=loss_fn, epoch_num=0
-    )
-    history[f"epoch1"] = epoch_history
-    return loss, history
+            return avg_loss, accuracy

@@ -7,10 +7,9 @@ import os
 from collections import defaultdict
 
 import albumentations as A
+import numpy as np
 import pandas as pd
 import torch
-from rich import print
-from rich.rule import Rule
 from sklearn.model_selection import KFold
 from torch import nn, optim
 from torch.optim import lr_scheduler
@@ -20,12 +19,21 @@ import config
 import dataset as ds
 import model as mod
 import training as tr
+from console import console
 
 
-def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
+def make_metric_string(metrics: dict[str, float]) -> str:
+    fmt = "[red]{metric}[/red]: [green bold]{value: .4f}[/green bold]"
+    gen = (fmt.format(metric=metric, value=value) for metric, value in metrics.items())
+    return "; ".join(gen)
+
+
+def train_one_fold(
+    dataset: data.Dataset, train_ids, val_ids, fold, save_model: bool = False
+):
     key = fold + 1
 
-    print(Rule(f"[green bold]Fold {key}[/green bold]"))
+    console.print(f"[green]Fold {key}[/green]", justify="center")
 
     train_sampler = data.SubsetRandomSampler(train_ids)
     val_sampler = data.SubsetRandomSampler(val_ids)
@@ -48,38 +56,48 @@ def train_one_fold(dataset, loss_fn, train_ids, val_ids, fold):
 
     model = mod.CatsDogsModel()
     model.to(config.DEVICE)
-    model.apply(mod.reset_model_weights)
 
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
     scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer=optimizer, T_0=config.COSINE_ANNEALING_T0
     )
 
-    print(Rule("[green bold]Training[/green bold]"))
+    engine = tr.Engine(model=model, optimizer=optimizer, scheduler=scheduler)
+    engine.reset_model_weights()
 
-    train_loss, train_history = tr.train_loop(
-        model=model,
-        data_loader=train_loader,
-        optimizer=optimizer,
-        loss_fn=loss_fn,
-        scheduler=scheduler,
-    )
+    best_loss = np.inf
+    history = defaultdict(list)
 
-    torch.save(
-        model.state_dict(), os.path.join(config.MODEL_DIR, f"model-fold{key}.pth")
-    )
+    for epoch in range(config.EPOCHS):
+        console.print(f"[green]Epoch {epoch + 1}[/green]", justify="center")
 
-    print(Rule("[green bold]Validating[/green bold]"))
+        t_loss, t_acc = engine.train(data_loader=train_loader, epoch_num=epoch)
+        val_loss, val_acc = engine.evaluate(data_loader=val_loader)
 
-    val_loss, val_history = tr.validation_loop(
-        model=model, data_loader=val_loader, loss_fn=loss_fn
-    )
+        console.print(
+            make_metric_string(
+                {
+                    "Training loss": t_loss,
+                    "Training accuracy": t_acc,
+                    "Validation loss": val_loss,
+                    "Validation accuracy": val_acc,
+                }
+            )
+        )
 
-    print(
-        f"[green]Train loss: {train_loss: .3f}, Validation loss: {val_loss: .3f}[green]"
-    )
+        history["train_loss"].append(t_loss)
+        history["train_acc"].append(t_acc)
+        history["val_loss"].append(val_loss)
+        history["val_acc"].append(val_acc)
 
-    return {"train": train_history, "val": val_history}
+        if val_loss < best_loss:
+            best_loss = val_loss
+            if save_model is True:
+                engine.save_model()
+
+    console.print(history)
+
+    return history
 
 
 def train():
@@ -99,14 +117,11 @@ def train():
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
     )
 
-    loss_fn = nn.BCELoss()
-
     fold_history = {}
 
     for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
         fold_history[f"fold{fold + 1}"] = train_one_fold(
             dataset=dataset,
-            loss_fn=loss_fn,
             train_ids=train_ids,
             val_ids=val_ids,
             fold=fold,
@@ -174,4 +189,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    history = main()
+    console.print(history)
