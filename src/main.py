@@ -168,18 +168,18 @@ def train(params, save_model: bool = False):
 
 def objective(trial: optuna.trial.Trial):
     params = {
-        "conv1_out": trial.suggest_int("conv1_out", 16, 128),
-        "conv2_out": trial.suggest_int("conv2_out", 16, 128),
-        "conv3_out": trial.suggest_int("conv3_out", 16, 128),
-        "conv4_out": trial.suggest_int("conv4_out", 16, 128),
-        "linear1_out": trial.suggest_int("linear1_out", 16, 128),
-        "linear2_out": trial.suggest_int("linear2_out", 16, 128),
-        "linear3_out": trial.suggest_int("linear3_out", 16, 128),
+        "conv1_out": trial.suggest_int("conv1_out", 16, 64),
+        "conv2_out": trial.suggest_int("conv2_out", 16, 64),
+        "conv3_out": trial.suggest_int("conv3_out", 16, 64),
+        "conv4_out": trial.suggest_int("conv4_out", 16, 64),
+        "linear1_out": trial.suggest_int("linear1_out", 16, 64),
+        "linear2_out": trial.suggest_int("linear2_out", 16, 64),
+        "linear3_out": trial.suggest_int("linear3_out", 16, 64),
         "kernel_size1": trial.suggest_categorical("kernel1", [3, 5]),
         "kernel_size2": trial.suggest_categorical("kernel1", [3, 5]),
         "lr": trial.suggest_loguniform("lr", 1e-6, 1e-3),
         "epochs": trial.suggest_int("epochs", 10, 100),
-        "batch_size": trial.suggest_int("batch_size", 64, 1024),
+        "batch_size": trial.suggest_int("batch_size", 64, 256),
         "dropout": trial.suggest_uniform("dropout", 0.1, 0.7),
     }
 
