@@ -69,7 +69,7 @@ def train_one_fold(
     train_sampler = data.SubsetRandomSampler(train_ids)
     val_sampler = data.SubsetRandomSampler(val_ids)
 
-    epochs, batch_size = params["epochs"], params["batch_size"]
+    batch_size = params["batch_size"]
 
     train_loader = data.DataLoader(
         dataset,
@@ -99,10 +99,14 @@ def train_one_fold(
     engine.reset_model_weights()
 
     best_loss = np.inf
+    early_stopping_rounds = 10
+    counter = 0
     history = defaultdict(list)
 
-    for epoch in range(epochs):
-        console.print(f"[green]Epoch {epoch + 1}[/green]", justify="center")
+    for epoch in range(config.EPOCHS):
+        console.print(
+            f"[green]Epoch {epoch + 1}/{config.EPOCHS}[/green]", justify="center"
+        )
 
         t_loss, t_acc = engine.train(data_loader=train_loader, epoch_num=epoch)
         val_loss, val_acc = engine.evaluate(data_loader=val_loader)
@@ -127,6 +131,11 @@ def train_one_fold(
             best_loss = val_loss
             if save_model is True:
                 engine.save_model()
+        else:
+            counter += 1
+
+        if counter > early_stopping_rounds:
+            break
 
     console.print(history)
 
@@ -178,7 +187,6 @@ def objective(trial: optuna.trial.Trial):
         "kernel_size1": trial.suggest_categorical("kernel1", [3, 5]),
         "kernel_size2": trial.suggest_categorical("kernel1", [3, 5]),
         "lr": trial.suggest_loguniform("lr", 1e-6, 1e-3),
-        "epochs": trial.suggest_int("epochs", 10, 100),
         "batch_size": trial.suggest_int("batch_size", 64, 256),
         "dropout": trial.suggest_uniform("dropout", 0.1, 0.7),
     }

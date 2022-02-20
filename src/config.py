@@ -3,7 +3,7 @@ import torch
 DATA_DIR = "data"
 IMG_HEIGHT = IMG_WIDTH = 200
 BATCH_SIZE = 64
-EPOCHS = 10
+EPOCHS = 15
 NUM_WORKERS = 4
 PIN_MEMORY = True
 LABEL_MAP = {"cat": 0, "dog": 1}
