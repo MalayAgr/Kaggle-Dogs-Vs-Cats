@@ -88,6 +88,7 @@ def train_one_fold(
     )
 
     model = mod.CatsDogsModel(n_targets=1, **get_model_params(params))
+    model.to(config.DEVICE)
 
     optimizer = optim.Adam(model.parameters(), lr=params["lr"])
     scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
@@ -175,7 +176,7 @@ def objective(trial: optuna.trial.Trial):
         "linear2_out": trial.suggest_int("linear2_out", 16, 128),
         "linear3_out": trial.suggest_int("linear3_out", 16, 128),
         "kernel_size1": trial.suggest_categorical("kernel1", [3, 5]),
-        "kernel_size2": trial.suggest_int("kernel2", 16, 128),
+        "kernel_size2": trial.suggest_categorical("kernel1", [3, 5]),
         "lr": trial.suggest_loguniform("lr", 1e-6, 1e-3),
         "epochs": trial.suggest_int("epochs", 10, 100),
         "batch_size": trial.suggest_int("batch_size", 64, 1024),
