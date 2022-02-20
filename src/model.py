@@ -65,7 +65,7 @@ class CatsDogsModel(nn.Module):
         return nn.Sequential(nn.Linear(in_features, out_features), nn.ReLU())
 
     def forward(self, image) -> torch.Tensor:
-        return self.layers(image)
+        return self.layers(image).squeeze(1)
 
 
 def reset_model_weights(model: nn.Module):
