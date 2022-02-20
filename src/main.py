@@ -7,6 +7,7 @@ from collections import defaultdict
 
 import albumentations as A
 import numpy as np
+import optuna
 import pandas as pd
 import torch
 from sklearn.model_selection import KFold
@@ -27,8 +28,39 @@ def make_metric_string(metrics: dict[str, float]) -> str:
     return "; ".join(gen)
 
 
+def get_model_params(params):
+    dict_params = {}
+
+    dict_params["conv_out_channels"] = [
+        params["conv1_out"],
+        params["conv2_out"],
+        params["conv3_out"],
+        params["conv4_out"],
+    ]
+
+    k1, k2 = params["kernel_size1"], params["kernel_size2"]
+
+    dict_params["kernel_sizes"] = [k1, k1, k2, k2]
+
+    dict_params["linear_out_features"] = [
+        params["linear1_out"],
+        params["linear2_out"],
+        params["linear3_out"],
+    ]
+
+    dict_params["dropout"] = params["dropout"]
+
+    return dict_params
+
+
 def train_one_fold(
-    dataset: data.Dataset, train_ids, val_ids, fold, save_model: bool = False
+    dataset: data.Dataset,
+    train_ids,
+    val_ids,
+    fold,
+    params,
+    *,
+    save_model: bool,
 ):
     key = fold + 1
 
@@ -37,9 +69,11 @@ def train_one_fold(
     train_sampler = data.SubsetRandomSampler(train_ids)
     val_sampler = data.SubsetRandomSampler(val_ids)
 
+    epochs, batch_size = params["epochs"], params["batch_size"]
+
     train_loader = data.DataLoader(
         dataset,
-        batch_size=config.BATCH_SIZE,
+        batch_size=batch_size,
         sampler=train_sampler,
         num_workers=config.NUM_WORKERS,
         pin_memory=config.PIN_MEMORY,
@@ -47,16 +81,15 @@ def train_one_fold(
 
     val_loader = data.DataLoader(
         dataset,
-        batch_size=config.BATCH_SIZE,
+        batch_size=batch_size,
         sampler=val_sampler,
         num_workers=config.NUM_WORKERS,
         pin_memory=config.PIN_MEMORY,
     )
 
-    model = mod.CatsDogsModel()
-    model.to(config.DEVICE)
+    model = mod.CatsDogsModel(n_targets=1, **get_model_params(params))
 
-    optimizer = optim.Adam(model.parameters(), lr=config.LR)
+    optimizer = optim.Adam(model.parameters(), lr=params["lr"])
     scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer=optimizer, T_0=config.COSINE_ANNEALING_T0
     )
@@ -67,7 +100,7 @@ def train_one_fold(
     best_loss = np.inf
     history = defaultdict(list)
 
-    for epoch in range(config.EPOCHS):
+    for epoch in range(epochs):
         console.print(f"[green]Epoch {epoch + 1}[/green]", justify="center")
 
         t_loss, t_acc = engine.train(data_loader=train_loader, epoch_num=epoch)
@@ -96,10 +129,10 @@ def train_one_fold(
 
     console.print(history)
 
-    return history
+    return best_loss
 
 
-def train():
+def train(params, save_model: bool = False):
     k_fold = KFold(n_splits=config.FOLDS, shuffle=True, random_state=42)
 
     transform = A.Compose(
@@ -116,17 +149,40 @@ def train():
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
     )
 
-    fold_history = {}
+    losses = []
 
     for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
-        fold_history[f"fold{fold + 1}"] = train_one_fold(
+        fold_loss = train_one_fold(
             dataset=dataset,
             train_ids=train_ids,
             val_ids=val_ids,
             fold=fold,
+            params=params,
+            save_model=save_model,
         )
+        losses.append(fold_loss)
 
-    return fold_history
+    return np.mean(losses)
+
+
+def objective(trial: optuna.trial.Trial):
+    params = {
+        "conv1_out": trial.suggest_int("conv1_out", 16, 128),
+        "conv2_out": trial.suggest_int("conv2_out", 16, 128),
+        "conv3_out": trial.suggest_int("conv3_out", 16, 128),
+        "conv4_out": trial.suggest_int("conv4_out", 16, 128),
+        "linear1_out": trial.suggest_int("linear1_out", 16, 128),
+        "linear2_out": trial.suggest_int("linear2_out", 16, 128),
+        "linear3_out": trial.suggest_int("linear3_out", 16, 128),
+        "kernel_size1": trial.suggest_categorical("kernel1", [3, 5]),
+        "kernel_size2": trial.suggest_int("kernel2", 16, 128),
+        "lr": trial.suggest_loguniform("lr", 1e-6, 1e-3),
+        "epochs": trial.suggest_int("epochs", 10, 100),
+        "batch_size": trial.suggest_int("batch_size", 64, 1024),
+        "dropout": trial.suggest_uniform("dropout", 0.1, 0.7),
+    }
+
+    return train(params)
 
 
 def make_inference():
@@ -183,10 +239,17 @@ def main():
 
     torch.manual_seed(42)
 
-    history = train()
-    return history
+    study = optuna.create_study(direction="minimize")
+    study.optimize(objective, n_trials=20)
+
+    console.print("Best Trial:")
+    best_trial = study.best_trial
+
+    print(best_trial.values)
+    print(best_trial.params)
+
+    train(best_trial.params, save_model=True)
 
 
 if __name__ == "__main__":
-    history = main()
-    console.print(history)
+    main()
