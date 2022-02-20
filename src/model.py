@@ -3,6 +3,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+import config
+
 
 class CatsDogsModel(nn.Module):
     def __init__(
@@ -32,7 +34,7 @@ class CatsDogsModel(nn.Module):
         if dropout > 0:
             layers.append(nn.Dropout(p=dropout))
 
-        in_features = conv_out_channels[-1] * 9 * 9
+        in_features = self._get_linear_in_features(layers)
 
         for out_features in linear_out_features:
             linear_block = self._make_linear_block(
@@ -54,11 +56,16 @@ class CatsDogsModel(nn.Module):
             nn.MaxPool2d(kernel_size=(2, 2)),
         )
 
+    def _get_linear_in_features(self, layers):
+        t = torch.rand(1, 3, config.IMG_HEIGHT, config.IMG_WIDTH)
+        temp = nn.Sequential(*layers)(t)
+        return temp.size(-1)
+
     def _make_linear_block(self, in_features, out_features):
         return nn.Sequential(nn.Linear(in_features, out_features), nn.ReLU())
 
     def forward(self, image) -> torch.Tensor:
-        return self.layers(image).squeeze(1)
+        return self.layers(image)
 
 
 def reset_model_weights(model: nn.Module):
