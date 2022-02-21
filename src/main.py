@@ -153,8 +153,10 @@ def train(params, save_model: bool = False):
         ]
     )
 
+    dataset_path = os.path.join(config.DATA_DIR, "train_data.csv")
+
     dataset = ds.CatsDogsDataset(
-        csv="data/train_data.csv",
+        csv=dataset_path,
         transform=transform,
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
     )
