@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 
 import torch
-from sklearn import metrics
 from torch import nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
@@ -28,16 +27,9 @@ class Engine:
 
     @staticmethod
     def accuracy(y_pred: torch.Tensor, y_true: torch.Tensor) -> float:
-        if y_true.is_cuda is True:
-            y_true = y_true.cpu()
-
-        if y_pred.is_cuda is True:
-            y_pred = y_pred.cpu()
-
-        y_true = y_true.detach().numpy()
-        y_pred = y_pred.detach().numpy() > 0.5
-
-        return metrics.accuracy_score(y_true, y_pred)
+        preds = (y_pred > 0.5).float()
+        correct = (y_true == y_pred).float().sum()
+        return correct / len(preds)
 
     def reset_model_weights(self) -> None:
         for layer in self.model.children():
