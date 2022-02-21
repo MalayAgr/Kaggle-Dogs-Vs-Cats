@@ -15,7 +15,7 @@ A complete pipeline for training and tuning (using [Optuna](https://optuna.org/)
 
 ## Requirements
 
-- Python \ge 3.8
+- Python &ge; 3.8
 - PyTorch
 - Scikit-learn
 - Albumentations
