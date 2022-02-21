@@ -100,7 +100,6 @@ def train_one_fold(
     engine.reset_model_weights()
 
     best_loss = np.inf
-    early_stopping_rounds = 10
     counter = 0
     history = defaultdict(list)
 
@@ -135,7 +134,7 @@ def train_one_fold(
         else:
             counter += 1
 
-        if counter > early_stopping_rounds:
+        if counter > config.EARLY_STOPPING_ROUNDS:
             break
 
     console.print(history)

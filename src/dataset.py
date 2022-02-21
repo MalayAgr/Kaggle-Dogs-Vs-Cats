@@ -30,8 +30,11 @@ class CatsDogsDataset(Dataset):
     def __len__(self) -> int:
         return len(self.df)
 
-    def __getitem__(self, idx) -> dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         # Load image path and label
+        if isinstance(idx, slice):
+            raise TypeError(f"{self.__class__.__name__} doesn't support slicing.")
+
         img = self.df.iloc[idx, 0]
 
         # Read image
@@ -92,7 +95,7 @@ def dir_to_csv(dir_name: str, dest: str, has_labels: bool = True) -> None:
         writer.writerows(rows)
 
 
-def order_test_data(csv_path):
+def order_test_data(csv_path: str) -> None:
     path = os.path.join(config.DATA_DIR, csv_path)
 
     df: pd.DataFrame = pd.read_csv(path)

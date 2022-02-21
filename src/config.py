@@ -9,6 +9,7 @@ PIN_MEMORY = True
 LABEL_MAP = {"cat": 0, "dog": 1}
 FOLDS = 5
 COSINE_ANNEALING_T0 = 10
+EARLY_STOPPING_ROUNDS = 5
 LR = 1e-3
 MODEL_DIR = "models"
 INFERENCE_DIR = "inferences"
