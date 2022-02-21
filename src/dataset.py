@@ -4,6 +4,7 @@ import csv
 import glob
 import os
 
+import albumentations as A
 import numpy as np
 import pandas as pd
 import torch
@@ -15,17 +16,21 @@ import config
 
 class CatsDogsDataset(Dataset):
     def __init__(
-        self, csv, transform=None, resize: tuple[int, int] = None, labels=True
+        self,
+        csv: str,
+        transform: A.Compose = None,
+        resize: tuple[int, int] = None,
+        labels: bool = True,
     ):
         self.df: pd.DataFrame = pd.read_csv(csv)
         self.transform = transform
         self.resize = resize
         self.labels = labels
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> dict[str, torch.Tensor]:
         # Load image path and label
         img = self.df.iloc[idx, 0]
 
@@ -58,7 +63,7 @@ class CatsDogsDataset(Dataset):
         return sample
 
 
-def dir_to_csv(dir_name, dest, has_labels=True):
+def dir_to_csv(dir_name: str, dest: str, has_labels: bool = True) -> None:
     def with_labels(path):
         label_map = config.LABEL_MAP
         yield from (

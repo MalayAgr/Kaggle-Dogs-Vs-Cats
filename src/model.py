@@ -31,7 +31,7 @@ class CatsDogsModel(nn.Module):
 
         layers.append(nn.Flatten())
 
-        if dropout > 0:
+        if dropout > 0.0:
             layers.append(nn.Dropout(p=dropout))
 
         in_features = self._get_linear_in_features(layers)
@@ -43,37 +43,29 @@ class CatsDogsModel(nn.Module):
             layers.append(linear_block)
             in_features = out_features
 
-        layers.append(nn.Linear(linear_out_features[-1], n_targets))
+        layers.append(nn.Linear(in_features, n_targets))
         layers.append(nn.Sigmoid())
 
         self.layers = nn.Sequential(*layers)
 
     def _make_conv_block(self, in_channels, out_channels, kernel_size):
         return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2)),
         )
 
-    def _get_linear_in_features(self, layers):
-        t = torch.rand(1, 3, config.IMG_HEIGHT, config.IMG_WIDTH)
-        t = t.to(config.DEVICE)
-        temp = nn.Sequential(*layers)
-        temp.to(config.DEVICE)
+    def _get_linear_in_features(self, layers: list[nn.Module]):
+        x = torch.rand(1, 3, config.IMG_HEIGHT, config.IMG_WIDTH, dtype=torch.float32)
+        x = x.to(config.DEVICE)
+        m = nn.Sequential(*layers)
+        m.to(config.DEVICE)
 
-        return temp(t).size(-1)
+        return m(x).size(-1)
 
     def _make_linear_block(self, in_features, out_features):
         return nn.Sequential(nn.Linear(in_features, out_features), nn.ReLU())
 
-    def forward(self, image) -> torch.Tensor:
+    def forward(self, image: torch.Tensor) -> torch.Tensor:
         return self.layers(image).squeeze(1)
-
-
-def reset_model_weights(model: nn.Module):
-    for layer in model.children():
-        try:
-            layer.reset_parameters()
-        except AttributeError:
-            pass

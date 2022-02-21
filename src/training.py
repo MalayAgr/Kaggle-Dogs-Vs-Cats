@@ -6,13 +6,17 @@ import torch
 from sklearn import metrics
 from torch import nn
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler
+from torch.utils import data
 from tqdm import tqdm
 
 import config
 
 
 class Engine:
-    def __init__(self, model: nn.Module, optimizer: Optimizer, scheduler=None) -> None:
+    def __init__(
+        self, model: nn.Module, optimizer: Optimizer, scheduler: _LRScheduler = None
+    ) -> None:
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -24,8 +28,10 @@ class Engine:
 
     @staticmethod
     def accuracy(y_pred: torch.Tensor, y_true: torch.Tensor) -> float:
-        if y_true.is_cuda is True and y_pred.is_cuda is True:
+        if y_true.is_cuda is True:
             y_true = y_true.cpu()
+
+        if y_pred.is_cuda is True:
             y_pred = y_pred.cpu()
 
         y_true = y_true.detach().numpy()
@@ -33,7 +39,7 @@ class Engine:
 
         return metrics.accuracy_score(y_true, y_pred)
 
-    def reset_model_weights(self):
+    def reset_model_weights(self) -> None:
         for layer in self.model.children():
             try:
                 layer.reset_parameters()
@@ -44,7 +50,9 @@ class Engine:
         path = os.path.join(config.MODEL_DIR, filename)
         torch.save(self.model.state_dict(), path)
 
-    def _train_one_step(self, data) -> tuple[torch.Tensor, float]:
+    def _train_one_step(
+        self, data: dict[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, float]:
         for key, value in data.items():
             data[key] = value.to(config.DEVICE)
 
@@ -60,7 +68,9 @@ class Engine:
 
         return loss, accuracy
 
-    def train(self, data_loader, epoch_num=0) -> tuple[float, float]:
+    def train(
+        self, data_loader: data.DataLoader, epoch_num: int = 0
+    ) -> tuple[float, float]:
         self.model.train()
 
         optimizer = self.optimizer
@@ -71,7 +81,7 @@ class Engine:
 
         with tqdm(data_loader, unit="batch", desc="Training") as p_loader:
             for batch_index, data in enumerate(p_loader):
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
 
                 loss, accuracy = self._train_one_step(data=data)
 
@@ -97,7 +107,9 @@ class Engine:
 
             return avg_loss, accuracy
 
-    def _evaluate_one_step(self, data) -> tuple[torch.Tensor, float]:
+    def _evaluate_one_step(
+        self, data: dict[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, float]:
         for key, value in data.items():
             data[key] = value.to(config.DEVICE)
 
@@ -109,7 +121,7 @@ class Engine:
 
         return loss, accuracy
 
-    def evaluate(self, data_loader) -> tuple[float, float]:
+    def evaluate(self, data_loader: data.DataLoader) -> tuple[float, float]:
         self.model.eval()
 
         total_loss = accuracy = 0.0

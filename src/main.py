@@ -4,6 +4,7 @@ import functools
 import glob
 import os
 from collections import defaultdict
+from typing import Any
 
 import albumentations as A
 import numpy as np
@@ -11,7 +12,7 @@ import optuna
 import pandas as pd
 import torch
 from sklearn.model_selection import KFold
-from torch import nn, optim
+from torch import optim
 from torch.optim import lr_scheduler
 from torch.utils import data
 
@@ -28,7 +29,7 @@ def make_metric_string(metrics: dict[str, float]) -> str:
     return "; ".join(gen)
 
 
-def get_model_params(params):
+def get_model_params(params: dict[str, Any]) -> dict[str, Any]:
     dict_params = {}
 
     dict_params["conv_out_channels"] = [
@@ -55,13 +56,13 @@ def get_model_params(params):
 
 def train_one_fold(
     dataset: data.Dataset,
-    train_ids,
-    val_ids,
-    fold,
-    params,
+    train_ids: np.ndarray,
+    val_ids: np.ndarray,
+    fold: int,
+    params: dict[str, Any],
     *,
-    save_model: bool,
-):
+    save_model: bool = False,
+) -> float:
     key = fold + 1
 
     console.print(f"[green]Fold {key}[/green]", justify="center")
@@ -130,7 +131,7 @@ def train_one_fold(
         if val_loss < best_loss:
             best_loss = val_loss
             if save_model is True:
-                engine.save_model()
+                engine.save_model(f"model-{key}.pth")
         else:
             counter += 1
 
@@ -142,7 +143,9 @@ def train_one_fold(
     return best_loss
 
 
-def train(params, save_model: bool = False):
+def train(
+    params: dict[str, Any], csv_file: str, *, save_model: bool = False
+) -> np.float32:
     k_fold = KFold(n_splits=config.FOLDS, shuffle=True, random_state=42)
 
     transform = A.Compose(
@@ -153,9 +156,9 @@ def train(params, save_model: bool = False):
         ]
     )
 
-    dataset_path = os.path.join(config.DATA_DIR, "train_data.csv")
+    dataset_path = os.path.join(config.DATA_DIR, csv_file)
 
-    dataset = ds.CatsDogsDataset(
+    train_data = ds.CatsDogsDataset(
         csv=dataset_path,
         transform=transform,
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
@@ -163,9 +166,9 @@ def train(params, save_model: bool = False):
 
     losses = []
 
-    for fold, (train_ids, val_ids) in enumerate(k_fold.split(dataset)):
+    for fold, (train_ids, val_ids) in enumerate(k_fold.split(train_data)):
         fold_loss = train_one_fold(
-            dataset=dataset,
+            dataset=train_data,
             train_ids=train_ids,
             val_ids=val_ids,
             fold=fold,
@@ -174,10 +177,10 @@ def train(params, save_model: bool = False):
         )
         losses.append(fold_loss)
 
-    return np.mean(losses)
+    return np.mean(losses, dtype=np.float32)
 
 
-def objective(trial: optuna.trial.Trial):
+def objective(trial: optuna.trial.Trial, csv_file: str) -> np.float32:
     params = {
         "conv1_out": trial.suggest_int("conv1_out", 16, 64),
         "conv2_out": trial.suggest_int("conv2_out", 16, 64),
@@ -193,14 +196,16 @@ def objective(trial: optuna.trial.Trial):
         "dropout": trial.suggest_uniform("dropout", 0.1, 0.7),
     }
 
-    return train(params)
+    return train(params, csv_file)
 
 
-def make_inference():
+def make_inference(csv_file: str) -> None:
     transform = A.Compose([A.Normalize(always_apply=True)])
 
+    test_data_path = os.path.join(config.DATA_DIR, csv_file)
+
     test_data = ds.CatsDogsDataset(
-        "data/test_data.csv",
+        csv=test_data_path,
         transform=transform,
         resize=(config.IMG_HEIGHT, config.IMG_WIDTH),
         labels=False,
@@ -212,7 +217,9 @@ def make_inference():
         else torch.load
     )
 
-    for fold, model_path in enumerate(glob.glob("models/*.pth")):
+    models_path = os.path.join(config.MODEL_DIR, "*.pth")
+
+    for fold, model_path in enumerate(glob.glob(models_path)):
         model = mod.CatsDogsModel()
 
         state_dict = model_loader(model_path)
@@ -220,7 +227,9 @@ def make_inference():
         model.to(config.DEVICE)
         model.eval()
 
-        data_loader = data.DataLoader(test_data)
+        data_loader = data.DataLoader(
+            test_data, num_workers=config.NUM_WORKERS, pin_memory=config.PIN_MEMORY
+        )
 
         df_dict = defaultdict(list)
 
@@ -234,10 +243,11 @@ def make_inference():
             df_dict["label"].append((preds > 0.5).item())
 
         df = pd.DataFrame.from_dict(df_dict)
-        df.to_csv(f"inferences/model-fold{fold + 1}.csv", index=False)
+        path = os.path.join(config.INFERENCE_DIR, f"model-fold{fold + 1}.csv")
+        df.to_csv(path, index=False)
 
 
-def main():
+def main() -> None:
     ds.dir_to_csv("train", "train_data.csv")
     ds.dir_to_csv("test1", "test_data.csv", has_labels=False)
     ds.order_test_data("test_data.csv")
@@ -250,8 +260,10 @@ def main():
 
     torch.manual_seed(42)
 
+    objective_ = functools.partial(objective, csv_file="train_data.csv")
+
     study = optuna.create_study(direction="minimize")
-    study.optimize(objective, n_trials=20)
+    study.optimize(objective_, n_trials=20)
 
     console.print("Best Trial:")
     best_trial = study.best_trial
