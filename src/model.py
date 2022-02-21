@@ -59,9 +59,10 @@ class CatsDogsModel(nn.Module):
     def _get_linear_in_features(self, layers):
         t = torch.rand(1, 3, config.IMG_HEIGHT, config.IMG_WIDTH)
         t = t.to(config.DEVICE)
-        temp = nn.Sequential(*layers)(t)
+        temp = nn.Sequential(*layers)
         temp.to(config.DEVICE)
-        return temp.size(-1)
+
+        return temp(t).size(-1)
 
     def _make_linear_block(self, in_features, out_features):
         return nn.Sequential(nn.Linear(in_features, out_features), nn.ReLU())
