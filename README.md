@@ -10,11 +10,12 @@ A complete pipeline for training and tuning (using [Optuna](https://optuna.org/)
 - [What's included](#whats-included)
 - [Model](#model)
 - [Optuna Tuning](#optuna-tuning)
+- [Data](#data)
 - [Run](#run)
 
 ## Requirements
 
-- Python &ge 3.8
+- Python \ge 3.8
 - PyTorch
 - Scikit-learn
 - Albumentations
@@ -61,24 +62,37 @@ The following parameters are tuned using Optuna:
 - Learning rate
 - Batch size
 
-## Run
+## Data
 
-> **Note**: This assumes that you've downloaded the data in the appropriate directory (see [config.py](src/config.py))
+- Create a directory which matches `DATA_DIR` in [config.py](src/config.py)
+- Download the dataset using the `kaggle` API ([guide](https://github.com/Kaggle/kaggle-api)) or from the competition page.
+
+```shell
+kaggle competitions download -c dogs-vs-cats
+```
+
+- Unzip `train.zip` and `test1.zip` inside `DATA_DIR`:
+
+```shell
+unzip <DATA_DIR>/train.zip -d data && unzip <DATA_DIR>/test1.zip -d data
+```
+
+## Run
 
 - Clone the repository
 
-```bash
+```shell
 git clone https://github.com/MalayAgr/Kaggle-Dogs-Vs-Cats.git
 ```
 
 - `cd` into the repository
 
-```bash
+```shell
 cd Kaggle-Dogs-Vs-Cats
 ```
 
-- Execute the `main.py` script
+- Execute the `main.py` script.
 
-```bash
-python src/main.pys
+```shell
+python src/main.py
 ```
