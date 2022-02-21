@@ -65,7 +65,12 @@ The following parameters are tuned using Optuna:
 ## Data
 
 - Create a directory which matches `DATA_DIR` in [config.py](src/config.py)
-- Download the dataset using the `kaggle` API ([guide](https://github.com/Kaggle/kaggle-api)) or from the competition page.
+
+```shell
+mkdir <DATA_DIR>
+```
+
+- Download the dataset using the `kaggle` API ([guide](https://github.com/Kaggle/kaggle-api)) or from the competition page inside `DATA_DIR`:
 
 ```shell
 kaggle competitions download -c dogs-vs-cats
@@ -74,24 +79,24 @@ kaggle competitions download -c dogs-vs-cats
 - Unzip `train.zip` and `test1.zip` inside `DATA_DIR`:
 
 ```shell
-unzip <DATA_DIR>/train.zip -d data && unzip <DATA_DIR>/test1.zip -d data
+unzip <DATA_DIR>/train.zip -d <DATA_DIR> && unzip <DATA_DIR>/test1.zip -d <DATA_DIR>
 ```
 
 ## Run
 
-- Clone the repository
+- Clone the repository:
 
 ```shell
 git clone https://github.com/MalayAgr/Kaggle-Dogs-Vs-Cats.git
 ```
 
-- `cd` into the repository
+- `cd` into the repository:
 
 ```shell
 cd Kaggle-Dogs-Vs-Cats
 ```
 
-- Execute the `main.py` script.
+- Execute the `main.py` script:
 
 ```shell
 python src/main.py
