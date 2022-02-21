@@ -27,9 +27,8 @@ class Engine:
 
     @staticmethod
     def accuracy(y_pred: torch.Tensor, y_true: torch.Tensor) -> float:
-        preds = (y_pred > 0.5).float()
-        correct = (y_true == y_pred).float().sum()
-        return correct / len(preds)
+        correct = (y_true == (y_pred > 0.5).float()).float().sum()
+        return correct / len(y_pred)
 
     def reset_model_weights(self) -> None:
         for layer in self.model.children():
