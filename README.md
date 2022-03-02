@@ -2,7 +2,10 @@
 
 A complete pipeline for training and tuning (using [Optuna](https://optuna.org/)) a convolutional neural network to classify cats and dogs. The pipeline contains many ideas that can be reused in multiple projects.
 
-**Competition link**: [https://www.kaggle.com/c/dogs-vs-cats](https://www.kaggle.com/c/dogs-vs-cats).
+**Competition link**: [Dogs vs. Cats](https://www.kaggle.com/c/dogs-vs-cats).
+
+**Notebook link**: [Dogs vs. Cats vs. PyTorch - Training a CNN Model](https://www.kaggle.com/defcodeking/dogs-vs-cats-vs-pytorch-training-a-cnn-mode).
+
 
 ## <!-- omit in toc --> Table of Contents
 
