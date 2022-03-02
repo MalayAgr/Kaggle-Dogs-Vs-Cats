@@ -19,12 +19,10 @@ class CatsDogsDataset(Dataset):
         self,
         csv: str,
         transform: A.Compose = None,
-        resize: tuple[int, int] = None,
         labels: bool = True,
     ):
         self.df: pd.DataFrame = pd.read_csv(csv)
         self.transform = transform
-        self.resize = resize
         self.labels = labels
 
     def __len__(self) -> int:
@@ -37,24 +35,17 @@ class CatsDogsDataset(Dataset):
 
         img = self.df.iloc[idx, 0]
 
-        # Read image
+        # Read image and convert to NumPy array
         img = Image.open(img)
-
-        # Resize if required
-        if self.resize is not None:
-            width, height = reversed(self.resize)
-            img = img.resize((width, height), resample=Image.BILINEAR)
-
-        # Convert to NumPy array
         img = np.array(img)
 
         # Apply transformations
         if self.transform is not None:
             img = self.transform(image=img)["image"]
 
-        # Move the channels axis to the front
-        img = np.transpose(img, axes=(-1, 0, 1))
-        img = torch.tensor(img)
+        # Move channels in front
+        img = np.swapaxes(img, -1, 0)
+        img = torch.tensor(img, dtype=torch.float32)
 
         sample = {"image": img}
 
@@ -119,3 +110,13 @@ def order_test_data(csv_path: str) -> None:
 
     # Overwrite existing file
     df.to_csv(path, index=False)
+
+
+def get_transforms() -> A.Compose:
+    return A.Compose(
+        [
+            A.HorizontalFlip(p=0.4),
+            A.RandomBrightnessContrast(p=0.2),
+            A.Normalize(always_apply=True),
+        ]
+    )
