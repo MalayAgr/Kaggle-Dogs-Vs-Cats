@@ -81,7 +81,7 @@ def main() -> None:
     transform = dataset.get_transforms()
     test_data = dataset.CatsDogsDataset(csv=dataset_path, transform=transform)
 
-    training.make_inference()
+    training.make_inference(data=test_data, params=best_trial.params)
 
 
 if __name__ == "__main__":
