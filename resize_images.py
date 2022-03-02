@@ -13,11 +13,10 @@ def resize_images() -> None:
     test_path = os.path.join(config.DATA_DIR, "test1", "*.jpg")
 
     for img_path in itertools.chain(glob.glob(train_path), glob.glob(test_path)):
-        img = Image.open(img_path)
-
-        if img.height != h or img.width != w:
-            img = img.resize((w, h), resample=Image.BILINEAR)
-            img.save(img_path)
+        with Image.open(img_path) as img:
+            if img.height != h or img.width != w:
+                img = img.resize((w, h), resample=Image.BILINEAR)
+                img.save(img_path)
 
 
 resize_images()

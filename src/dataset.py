@@ -33,11 +33,12 @@ class CatsDogsDataset(Dataset):
         if isinstance(idx, slice):
             raise TypeError(f"{self.__class__.__name__} doesn't support slicing.")
 
-        img = self.df.iloc[idx, 0]
+        img_path = self.df.iloc[idx, 0]
 
         # Read image and convert to NumPy array
-        img = Image.open(img)
-        img = np.array(img)
+
+        with Image.open(img_path) as img:
+            img = np.array(img)
 
         # Apply transformations
         if self.transform is not None:
