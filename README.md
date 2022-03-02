@@ -6,7 +6,6 @@ A complete pipeline for training and tuning (using [Optuna](https://optuna.org/)
 
 **Notebook link**: [Dogs vs. Cats vs. PyTorch - Training a CNN Model](https://www.kaggle.com/defcodeking/dogs-vs-cats-vs-pytorch-training-a-cnn-mode).
 
-
 ## <!-- omit in toc --> Table of Contents
 
 - [Requirements](#requirements)

@@ -166,6 +166,7 @@ class Engine:
             self.history["val_loss"].append(avg_loss)
             return avg_loss, total_correct
 
+
 def train(
     dataset: data.Dataset,
     params: dict[str, Any],
