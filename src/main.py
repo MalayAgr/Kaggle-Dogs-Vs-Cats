@@ -78,7 +78,7 @@ def main() -> None:
     print(f"Avg. validation loss:{val_loss:.4f}")
 
     dataset_path = os.path.join(config.DATA_DIR, "test_data.csv")
-    transform = dataset.get_transforms()
+    transform = dataset.get_transforms(only_normalize=True)
     test_data = dataset.CatsDogsDataset(csv=dataset_path, transform=transform)
 
     training.make_inference(data=test_data, params=best_trial.params)

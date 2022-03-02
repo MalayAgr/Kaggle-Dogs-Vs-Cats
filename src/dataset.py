@@ -112,7 +112,10 @@ def order_test_data(csv_path: str) -> None:
     df.to_csv(path, index=False)
 
 
-def get_transforms() -> A.Compose:
+def get_transforms(only_normalize: bool = False) -> A.Compose:
+    if only_normalize is True:
+        return A.Compose([A.Normalize(always_apply=True)])
+
     return A.Compose(
         [
             A.HorizontalFlip(p=0.4),
