@@ -3,6 +3,5 @@ matplotlib~=3.5.1
 numpy~=1.22.2
 pandas~=1.4.1
 Pillow~=9.0.1
-scikit-learn~=1.0.2
 torch~=1.10.2
 optuna~=2.10.0
