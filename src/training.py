@@ -46,8 +46,6 @@ class Engine:
         train_loss = self.history["train_loss"]
         val_loss = self.history["val_loss"]
 
-        print(train_loss, val_loss)
-
         plt.figure()
         plt.plot(train_loss, label="Training")
         plt.plot(val_loss, label="Validation")
