@@ -1,9 +1,10 @@
-from PIL import Image
 import glob
 import itertools
+import os
+
+from PIL import Image
 
 from src import config
-import os
 
 
 def resize_images() -> None:
